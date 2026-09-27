@@ -50,11 +50,7 @@ If you're testing on a real Android phone instead of an emulator, you first need
 
 4. Demo Accounts
 The system ships with four seeded accounts, one for each role, so you can explore the app immediately without registering a new user:
-Role	Email	Password
-Admin	admin@example.com	password
-Customer	customer@example.com	password
-Vendor — Amenuveve Enterprise	v@gmail.com	password
-Vendor — YK	yk@gmail.com	password
+
 
 Log in as Admin to review and approve vendors and monitor activity on the map dashboard; as Customer to browse nearby vendors, order sachet or bottle water, and pay through Paystack or as either Vendor account to manage products, delivery zones, and incoming orders.
 
