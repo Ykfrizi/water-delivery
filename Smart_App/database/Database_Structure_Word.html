@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Smart_App — Database Structure</title>
+<style>
+body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.35; margin: 2cm; color: #000; }
+h1 { font-size: 18pt; }
+h2 { font-size: 14pt; margin-top: 18pt; border-bottom: 1pt solid #333; padding-bottom: 4pt; }
+h3 { font-size: 12pt; margin-top: 14pt; }
+table { border-collapse: collapse; width: 100%; margin: 8pt 0 14pt 0; font-size: 10pt; }
+th, td { border: 1pt solid #666; padding: 4pt 6pt; text-align: left; vertical-align: top; }
+th { background: #f0f0f0; }
+.note { font-size: 10pt; font-style: italic; margin-top: 6pt; }
+ul { margin-top: 6pt; }
+</style>
+</head>
+<body>
+
+
+<h2>1. Overview</h2>
+<p>The schema separates <strong>identity</strong> (<code>users</code>, Sanctum <code>personal_access_tokens</code>), <strong>vendor storefront data</strong> (<code>vendor_profiles</code>, <code>delivery_zones</code>, <code>products</code>), and <strong>social proof</strong> (<code>reviews</code>). Laravel queue/cache/session tables support framework features.</p>
+<ul>
+<li><strong>users.role</strong> distinguishes customer, vendor, and admin accounts (application enum).</li>
+<li><strong>vendor_profiles.user_id</strong> links each vendor storefront to exactly one user.</li>
+<li><strong>reviews</strong> tie a customer user to a vendor profile with a uniqueness constraint on (<code>customer_id</code>, <code>vendor_profile_id</code>).</li>
+</ul>
+
+<h2>2. Table: users</h2>
+<p>Primary application accounts for customers, vendors, and admins.</p>
+<table>
+<tr><th>Column</th><th>Type / notes</th><th>Constraints</th></tr>
+<tr><td>id</td><td>bigint unsigned, auto-increment</td><td>PRIMARY KEY</td></tr>
+<tr><td>name</td><td>string(255)</td><td>NOT NULL</td></tr>
+<tr><td>email</td><td>string(255)</td><td>NOT NULL, UNIQUE</td></tr>
+<tr><td>role</td><td>string</td><td>NOT NULL, default &quot;customer&quot; — values: customer, vendor, admin</td></tr>
+<tr><td>email_verified_at</td><td>timestamp</td><td>nullable</td></tr>
+<tr><td>password</td><td>string</td><td>NOT NULL (hashed)</td></tr>
+<tr><td>remember_token</td><td>string</td><td>nullable (session &quot;remember me&quot;)</td></tr>
+<tr><td>created_at, updated_at</td><td>timestamp</td><td>Laravel timestamps</td></tr>
+</table>
+
+<h2>3. Table: password_reset_tokens</h2>
+<p>Laravel password reset flow.</p>
+<table>
+<tr><th>Column</th><th>Type / notes</th><th>Constraints</th></tr>
+<tr><td>email</td><td>string</td><td>PRIMARY KEY</td></tr>
+<tr><td>token</td><td>string</td><td>NOT NULL</td></tr>
+<tr><td>created_at</td><td>timestamp</td><td>nullable</td></tr>
+</table>
+
+<h2>4. Table: sessions</h2>
+<p>Database session driver (optional; used when session driver is database).</p>
+<table>
+<tr><th>Column</th><th>Type / notes</th><th>Constraints</th></tr>
+<tr><td>id</td><td>string</td><td>PRIMARY KEY</td></tr>
+<tr><td>user_id</td><td>bigint unsigned</td><td>nullable, INDEX, FK → users.id</td></tr>
+<tr><td>ip_address</td><td>string(45)</td><td>nullable</td></tr>
+<tr><td>user_agent</td><td>text</td><td>nullable</td></tr>
+<tr><td>payload</td><td>longText</td><td>NOT NULL</td></tr>
+<tr><td>last_activity</td><td>integer</td><td>NOT NULL, INDEX</td></tr>
+</table>
+
+<h2>5. Tables: cache and cache_locks</h2>
+<p>Laravel cache store when using the database driver.</p>
+<table>
+<tr><th>cache</th><th>Description</th></tr>
+<tr><td>key</td><td>PRIMARY KEY (string)</td></tr>
+<tr><td>value</td><td>mediumText</td></tr>
+<tr><td>expiration</td><td>integer, INDEX</td></tr>
+</table>
+<table>
+<tr><th>cache_locks</th><th>Description</th></tr>
+<tr><td>key</td><td>PRIMARY KEY (string)</td></tr>
+<tr><td>owner</td><td>string</td></tr>
+<tr><td>expiration</td><td>integer, INDEX</td></tr>
+</table>
+
+<h2>6. Tables: jobs, job_batches, failed_jobs</h2>
+<p>Laravel queue infrastructure.</p>
+<table>
+<tr><th>jobs</th><th>Description</th></tr>
+<tr><td>id</td><td>bigint, PRIMARY KEY</td></tr>
+<tr><td>queue</td><td>string, INDEX</td></tr>
+<tr><td>payload</td><td>longText</td></tr>
+<tr><td>attempts</td><td>unsignedTinyInteger</td></tr>
+<tr><td>reserved_at</td><td>unsignedInteger, nullable</td></tr>
+<tr><td>available_at, created_at</td><td>unsignedInteger</td></tr>
+</table>
+<table>
+<tr><th>job_batches</th><th>Description</th></tr>
+<tr><td>id</td><td>string, PRIMARY KEY</td></tr>
+<tr><td>name</td><td>string</td></tr>
+<tr><td>total_jobs, pending_jobs, failed_jobs</td><td>integer</td></tr>
+<tr><td>failed_job_ids</td><td>longText</td></tr>
+<tr><td>options</td><td>mediumText, nullable</td></tr>
+<tr><td>cancelled_at, created_at, finished_at</td><td>integer, nullable where noted</td></tr>
+</table>
+<table>
+<tr><th>failed_jobs</th><th>Description</th></tr>
+<tr><td>id</td><td>bigint, PRIMARY KEY</td></tr>
+<tr><td>uuid</td><td>string, UNIQUE</td></tr>
+<tr><td>connection, queue</td><td>text</td></tr>
+<tr><td>payload, exception</td><td>longText</td></tr>
+<tr><td>failed_at</td><td>timestamp, default current</td></tr>
+</table>
+
+<h2>7. Table: personal_access_tokens</h2>
+<p>Laravel Sanctum API tokens for mobile/clients (morphs to <code>users</code>).</p>
+<table>
+<tr><th>Column</th><th>Type / notes</th><th>Constraints</th></tr>
+<tr><td>id</td><td>bigint unsigned</td><td>PRIMARY KEY</td></tr>
+<tr><td>tokenable_type</td><td>string</td><td>morph — typically App\Models\User</td></tr>
+<tr><td>tokenable_id</td><td>bigint unsigned</td><td>morph — INDEX with type</td></tr>
+<tr><td>name</td><td>text</td><td>token label (e.g. device name)</td></tr>
+<tr><td>token</td><td>string(64)</td><td>NOT NULL, UNIQUE (hashed token)</td></tr>
+<tr><td>abilities</td><td>text</td><td>nullable</td></tr>
+<tr><td>last_used_at</td><td>timestamp</td><td>nullable</td></tr>
+<tr><td>expires_at</td><td>timestamp</td><td>nullable, INDEX</td></tr>
+<tr><td>created_at, updated_at</td><td>timestamp</td><td></td></tr>
+</table>
+
+<h2>8. Table: vendor_profiles</h2>
+<p>Public storefront and discovery fields for each vendor user.</p>
+<table>
+<tr><th>Column</th><th>Type / notes</th><th>Constraints</th></tr>
+<tr><td>id</td><td>bigint unsigned</td><td>PRIMARY KEY</td></tr>
+<tr><td>user_id</td><td>bigint unsigned</td><td>NOT NULL, UNIQUE, FK → users.id, ON DELETE CASCADE</td></tr>
+<tr><td>slug</td><td>string</td><td>NOT NULL, UNIQUE (URL-friendly identifier)</td></tr>
+<tr><td>business_name</td><td>string</td><td>NOT NULL</td></tr>
+<tr><td>description</td><td>text</td><td>nullable</td></tr>
+<tr><td>logo_url</td><td>string</td><td>nullable</td></tr>
+<tr><td>phone</td><td>string</td><td>nullable</td></tr>
+<tr><td>city</td><td>string</td><td>nullable, INDEX</td></tr>
+<tr><td>region</td><td>string</td><td>nullable, INDEX</td></tr>
+<tr><td>country</td><td>string</td><td>nullable, INDEX</td></tr>
+<tr><td>latitude</td><td>decimal(10,7)</td><td>nullable, INDEX</td></tr>
+<tr><td>longitude</td><td>decimal(10,7)</td><td>nullable, INDEX</td></tr>
+<tr><td>categories</td><td>JSON</td><td>nullable — array of category tags</td></tr>
+<tr><td>is_active</td><td>boolean</td><td>NOT NULL, default true, INDEX</td></tr>
+<tr><td>average_rating</td><td>decimal(3,2)</td><td>default 0 — cached from reviews</td></tr>
+<tr><td>ratings_count</td><td>unsigned integer</td><td>default 0 — cached count</td></tr>
+<tr><td>created_at, updated_at</td><td>timestamp</td><td></td></tr>
+</table>
+
+<h2>9. Table: delivery_zones</h2>
+<p>Approximate service areas (center point + radius) for transparency.</p>
+<table>
+<tr><th>Column</th><th>Type / notes</th><th>Constraints</th></tr>
+<tr><td>id</td><td>bigint unsigned</td><td>PRIMARY KEY</td></tr>
+<tr><td>vendor_profile_id</td><td>bigint unsigned</td><td>NOT NULL, FK → vendor_profiles.id, ON DELETE CASCADE</td></tr>
+<tr><td>name</td><td>string</td><td>NOT NULL</td></tr>
+<tr><td>latitude</td><td>decimal(10,7)</td><td>NOT NULL</td></tr>
+<tr><td>longitude</td><td>decimal(10,7)</td><td>NOT NULL</td></tr>
+<tr><td>radius_km</td><td>decimal(8,2)</td><td>NOT NULL</td></tr>
+<tr><td>note</td><td>text</td><td>nullable</td></tr>
+<tr><td>created_at, updated_at</td><td>timestamp</td><td></td></tr>
+</table>
+
+<h2>10. Table: products</h2>
+<p>Catalog items with pricing and stock for marketplace transparency.</p>
+<table>
+<tr><th>Column</th><th>Type / notes</th><th>Constraints</th></tr>
+<tr><td>id</td><td>bigint unsigned</td><td>PRIMARY KEY</td></tr>
+<tr><td>vendor_profile_id</td><td>bigint unsigned</td><td>NOT NULL, FK → vendor_profiles.id, ON DELETE CASCADE</td></tr>
+<tr><td>name</td><td>string</td><td>NOT NULL</td></tr>
+<tr><td>slug</td><td>string</td><td>NOT NULL — UNIQUE together with vendor_profile_id</td></tr>
+<tr><td>description</td><td>text</td><td>nullable</td></tr>
+<tr><td>sku</td><td>string</td><td>nullable, INDEX</td></tr>
+<tr><td>price</td><td>decimal(12,2)</td><td>NOT NULL</td></tr>
+<tr><td>currency</td><td>string(3)</td><td>NOT NULL, default USD</td></tr>
+<tr><td>stock_quantity</td><td>unsigned integer</td><td>default 0</td></tr>
+<tr><td>is_available</td><td>boolean</td><td>NOT NULL, default true, INDEX</td></tr>
+<tr><td>attributes</td><td>JSON</td><td>nullable — filterable key/value pairs</td></tr>
+<tr><td>created_at, updated_at</td><td>timestamp</td><td></td></tr>
+</table>
+<p class="note">Unique constraint: (<code>vendor_profile_id</code>, <code>slug</code>).</p>
+
+<h2>11. Table: reviews</h2>
+<p>Customer ratings and comments; one row per customer per vendor profile.</p>
+<table>
+<tr><th>Column</th><th>Type / notes</th><th>Constraints</th></tr>
+<tr><td>id</td><td>bigint unsigned</td><td>PRIMARY KEY</td></tr>
+<tr><td>vendor_profile_id</td><td>bigint unsigned</td><td>NOT NULL, FK → vendor_profiles.id, ON DELETE CASCADE</td></tr>
+<tr><td>customer_id</td><td>bigint unsigned</td><td>NOT NULL, FK → users.id, ON DELETE CASCADE</td></tr>
+<tr><td>rating</td><td>unsigned tinyint</td><td>NOT NULL — typically 1–5</td></tr>
+<tr><td>comment</td><td>text</td><td>nullable</td></tr>
+<tr><td>created_at, updated_at</td><td>timestamp</td><td></td></tr>
+</table>
+<p class="note">Unique constraint: (<code>customer_id</code>, <code>vendor_profile_id</code>).</p>
+
+<h2>12. Relationship summary</h2>
+<ul>
+<li><strong>users</strong> 1 — 0..1 <strong>vendor_profiles</strong> (vendors only).</li>
+<li><strong>vendor_profiles</strong> 1 — * <strong>delivery_zones</strong>, <strong>products</strong>, <strong>reviews</strong>.</li>
+<li><strong>users</strong> (customers) 1 — * <strong>reviews</strong> as <code>customer_id</code>.</li>
+<li><strong>users</strong> 1 — * <strong>personal_access_tokens</strong> (polymorphic).</li>
+</ul>
+
+
+</body>
+</html>

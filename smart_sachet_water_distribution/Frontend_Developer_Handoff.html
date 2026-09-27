@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Smart_App — Frontend Developer Handoff</title>
+<style>
+  @page { margin: 18mm; }
+  body { font-family: Calibri, "Segoe UI", Arial, sans-serif; font-size: 11pt; line-height: 1.35; color: #111; max-width: 210mm; margin: 0 auto; padding: 12mm; }
+  h1 { font-size: 18pt; margin: 0 0 12pt 0; }
+  h2 { font-size: 13pt; margin: 18pt 0 8pt 0; border-bottom: 1px solid #333; padding-bottom: 4pt; }
+  h3 { font-size: 11.5pt; margin: 14pt 0 6pt 0; }
+  table { border-collapse: collapse; width: 100%; margin: 8pt 0 12pt 0; font-size: 10pt; page-break-inside: avoid; }
+  th, td { border: 1px solid #666; padding: 5pt 7pt; text-align: left; vertical-align: top; }
+  th { background: #f3f3f3; font-weight: bold; }
+  code { font-family: Consolas, monospace; font-size: 9.5pt; }
+  ul { margin: 6pt 0 10pt 18pt; padding: 0; }
+  .muted { font-size: 10pt; color: #444; margin-top: 6pt; }
+  .footer { margin-top: 24pt; font-size: 9pt; color: #555; border-top: 1px solid #ccc; padding-top: 8pt; }
+</style>
+</head>
+<body>
+
+<h1>Smart_App — Frontend Developer Handoff</h1>
+<p class="muted">API base: <code>{APP_URL}/api/v1</code> — replace with your environment (e.g. local XAMPP host or production HTTPS URL). All routes below are relative to <code>/api/v1</code>.</p>
+
+<h2>1. Cross-cutting (all apps)</h2>
+<table>
+<tr><th>Topic</th><th>Frontend responsibility</th></tr>
+<tr><td>Format</td><td>JSON over HTTPS; send <code>Accept: application/json</code>.</td></tr>
+<tr><td>Authentication</td><td>Laravel Sanctum: store <code>token</code> from login/register securely; send <code>Authorization: Bearer &lt;token&gt;</code> on protected routes.</td></tr>
+<tr><td>Three personas</td><td>Customer, vendor, and admin use <strong>different</strong> auth endpoints and tokens — wrong role returns <strong>403</strong>.</td></tr>
+<tr><td>Logout</td><td><code>POST …/auth/logout</code> with Bearer token; clear local token.</td></tr>
+<tr><td>Errors</td><td>Handle <strong>401</strong> (unauthenticated), <strong>403</strong> (forbidden / wrong role), <strong>404</strong>, <strong>422</strong> (validation — surface field errors).</td></tr>
+<tr><td>Identifiers</td><td>Vendors in URLs use <strong>slug</strong>. Orders use <strong>order_number</strong> in paths such as <code>orders/{order}</code>.</td></tr>
+</table>
+
+<h2>2. Customer app (shopper)</h2>
+<table>
+<tr><th>Feature</th><th>Endpoints</th></tr>
+<tr><td>Register / login</td><td><code>POST /customer/auth/register</code>, <code>POST /customer/auth/login</code></td></tr>
+<tr><td>Session</td><td><code>GET /customer/me</code>, <code>POST /customer/auth/logout</code></td></tr>
+<tr><td>Marketplace (read)</td><td>Public <code>/marketplace/…</code> (section 5) — no auth</td></tr>
+<tr><td>Reviews</td><td><code>POST /customer/vendors/{vendor}/reviews</code> — <code>{vendor}</code> = slug; rating + optional comment</td></tr>
+<tr><td>Cart</td><td><code>GET /customer/cart</code>; <code>POST /customer/cart/items</code> (<code>product_id</code>, <code>quantity</code>); <code>PATCH /customer/cart/items/{cart_item}</code>; <code>DELETE …</code>; <code>DELETE /customer/cart</code></td></tr>
+<tr><td>Checkout</td><td><code>POST /customer/checkout</code> — optional <code>notes</code>, <code>shipping_address</code> object</td></tr>
+<tr><td>Orders</td><td><code>GET /customer/orders</code>, <code>GET /customer/orders/{order}</code> (<code>order</code> = order_number)</td></tr>
+<tr><td>Cancel order</td><td><code>PATCH /customer/orders/{order}</code> with <code>{"status":"cancelled"}</code> — only while status is <strong>pending</strong></td></tr>
+</table>
+<p><strong>UI work:</strong> onboarding; browse vendors/products; cart badge; totals (API may return <code>totals_by_currency</code>); checkout address form; order history; cancel pending; empty/loading/error states.</p>
+
+<h2>3. Vendor app (shop owner)</h2>
+<table>
+<tr><th>Feature</th><th>Endpoints</th></tr>
+<tr><td>Register / login</td><td><code>POST /vendor/auth/register</code> (optional <code>business_name</code>), <code>POST /vendor/auth/login</code></td></tr>
+<tr><td>Profile</td><td><code>GET /vendor/profile</code>, <code>PUT /vendor/profile</code></td></tr>
+<tr><td>Products</td><td><code>GET/POST /vendor/products</code>; <code>GET/PUT/PATCH/DELETE /vendor/products/{product}</code></td></tr>
+<tr><td>Delivery zones</td><td><code>GET/POST /vendor/delivery-zones</code>; <code>GET/PUT/PATCH/DELETE /vendor/delivery-zones/{delivery_zone}</code></td></tr>
+<tr><td>Orders</td><td><code>GET /vendor/orders</code> (query: <code>status</code>, <code>from</code>, <code>to</code>, <code>per_page</code>); <code>GET /vendor/orders/{order}</code>; <code>PATCH /vendor/orders/{order}</code> with <code>status</code> (allowed transitions enforced server-side)</td></tr>
+</table>
+<p><strong>UI work:</strong> dashboard; catalog CRUD; zones (map or lat/lng/radius); order inbox/detail/status actions; display buyer name/email from order when returned.</p>
+
+<h2>4. Admin app</h2>
+<table>
+<tr><th>Feature</th><th>Endpoints</th></tr>
+<tr><td>Login</td><td><code>POST /admin/auth/login</code> — no public registration</td></tr>
+<tr><td>Session</td><td><code>GET /admin/me</code>, <code>POST /admin/auth/logout</code></td></tr>
+<tr><td>Orders</td><td><code>GET /admin/orders</code> (filters: <code>status</code>, <code>from</code>, <code>to</code>, <code>vendor_slug</code>, <code>customer_email</code>, <code>order_number</code>, <code>per_page</code>); <code>GET /admin/orders/{order}</code>; <code>PATCH /admin/orders/{order}</code></td></tr>
+</table>
+<p><strong>UI work:</strong> searchable order table; order detail; admin status updates (rules differ from vendor — API enforces).</p>
+
+<h2>5. Public marketplace (no authentication)</h2>
+<table>
+<tr><th>Feature</th><th>Endpoints</th></tr>
+<tr><td>Vendor directory / search</td><td><code>GET /marketplace/vendors</code> — query params for text search, location (<code>latitude</code>, <code>longitude</code>, <code>radius_km</code>), filters, sort, <code>per_page</code></td></tr>
+<tr><td>Vendor profile + delivery zones</td><td><code>GET /marketplace/vendors/{vendor}</code></td></tr>
+<tr><td>Products</td><td><code>GET /marketplace/vendors/{vendor}/products</code> — filters e.g. price, <code>in_stock</code>, <code>q</code></td></tr>
+<tr><td>Reviews</td><td><code>GET /marketplace/vendors/{vendor}/reviews</code></td></tr>
+</table>
+<p><strong>UI work:</strong> discovery screens, filters, vendor cards, product lists, reviews; optional map/geolocation for search params.</p>
+
+<h2>6. Necessary non-screen items</h2>
+<ul>
+<li><strong>Secure token storage</strong> per app/persona on mobile (Keychain / EncryptedSharedPreferences / equivalent).</li>
+<li><strong>Environment config</strong> for API base URL per build flavor.</li>
+<li><strong>422 validation</strong> mapped to forms (register, profile, cart, checkout).</li>
+<li><strong>Pagination</strong> for list endpoints that support <code>per_page</code>.</li>
+<li><strong>Images</strong> — backend returns URLs (e.g. <code>logo_url</code>); handle placeholders and failures.</li>
+<li><strong>Order lifecycle</strong> — show only sensible next actions; invalid transitions return API errors.</li>
+</ul>
+
+<h2>7. Not in current backend</h2>
+<ul>
+<li>USSD</li>
+<li>Payment provider flows (no payment endpoints yet)</li>
+<li>Push/SMS notifications (unless added later)</li>
+</ul>
+
+<div class="footer">
+Generated for Smart_App Laravel API. Regenerate or edit <code>docs/Frontend_Developer_Handoff.html</code> as the backend evolves.
+</div>
+
+</body>
+</html>
